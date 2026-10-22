@@ -16,7 +16,6 @@
 #include <vector>
 #include <map>
 #include <string>
-#include <sstream>
 
 #include "Trace.h"
 
@@ -59,11 +58,11 @@ namespace Microsoft
         {
         public:
             SwapChainProcessor(IndirectMonitorContext* monitorContext,
-                               IDDCX_SWAPCHAIN hSwapChain, std::shared_ptr<Direct3DDevice> Device, HANDLE NewFrameEvent);
+                               IDDCX_SWAPCHAIN hSwapChain, std::shared_ptr<Direct3DDevice> device, HANDLE newFrameEvent);
             ~SwapChainProcessor();
 
         private:
-            static DWORD CALLBACK RunThread(LPVOID Argument);
+            static DWORD CALLBACK RunThread(LPVOID argument);
 
             void Run();
             void RunCore();
@@ -84,7 +83,7 @@ namespace Microsoft
         class IndirectDeviceContext
         {
         public:
-            IndirectDeviceContext(_In_ WDFDEVICE WdfDevice);
+            IndirectDeviceContext(_In_ WDFDEVICE wdfDevice);
             virtual ~IndirectDeviceContext();
 
             void InitAdapter();
@@ -100,10 +99,10 @@ namespace Microsoft
         class IndirectMonitorContext
         {
         public:
-            IndirectMonitorContext(_In_ UINT ConnectorIndex, _In_ IDDCX_MONITOR Monitor, _In_ IDDCX_ADAPTER Adapter);
+            IndirectMonitorContext(_In_ UINT connectorIndex, _In_ IDDCX_MONITOR monitor, _In_ IDDCX_ADAPTER adapter);
             virtual ~IndirectMonitorContext();
 
-            void AssignSwapChain(IDDCX_SWAPCHAIN SwapChain, LUID RenderAdapter, HANDLE NewFrameEvent);
+            void AssignSwapChain(IDDCX_SWAPCHAIN swapChain, LUID renderAdapter, HANDLE newFrameEvent);
             void UnassignSwapChain();
 
             UINT GetConnectorIndex() { return m_ConnectorIndex; }
