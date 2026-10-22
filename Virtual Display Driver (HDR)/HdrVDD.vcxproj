@@ -39,10 +39,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Driver.h" />
+    <ClInclude Include="IOHelper.h" />
     <ClInclude Include="Trace.h" />
+    <ClInclude Include="version.h" />
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="MttVDD.inf" />
+    <Inf Include="HdrVDD.inf" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{2D54CB75-8B17-4F11-97DC-847B0244CD46}</ProjectGuid>
@@ -51,7 +53,7 @@
     <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
     <Configuration>Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">Win32</Platform>
-    <RootNamespace>MttVDD</RootNamespace>
+    <RootNamespace>VDD</RootNamespace>
   </PropertyGroup>
   <PropertyGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <PlatformToolset>WindowsUserModeDriver10.0</PlatformToolset>
@@ -219,7 +221,7 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
       <ExceptionHandling>Async</ExceptionHandling>
       <EnablePREfast>true</EnablePREfast>
-      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);OneCoreUAP.lib;avrt.lib;setupapi.lib</AdditionalDependencies>
@@ -232,7 +234,7 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
       <ExceptionHandling>Async</ExceptionHandling>
       <EnablePREfast>true</EnablePREfast>
-      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);OneCoreUAP.lib;avrt.lib;setupapi.lib</AdditionalDependencies>
@@ -245,8 +247,8 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
       <ExceptionHandling>Async</ExceptionHandling>
       <EnablePREfast>true</EnablePREfast>
-      <AdditionalOptions>/D_ATL_NO_WIN_SUPPORT /DUMDF_DRIVER /DIDDCX_VERSION_MAJOR=1 /DIDDCX_VERSION_MINOR=4 /DIDDCX_MINIMUM_VERSION_REQUIRED=4 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/D_ATL_NO_WIN_SUPPORT /DUMDF_DRIVER /DIDDCX_VERSION_MAJOR=1 /DIDDCX_VERSION_MINOR=4 /DIDDCX_MINIMUM_VERSION_REQUIRED=4 /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -256,7 +258,7 @@
       <FileDigestAlgorithm>SHA1</FileDigestAlgorithm>
     </DriverSign>
     <PostBuildEvent>
-      <Command>copy "$(ProjectDir)..\vdd_settings.xml" "$(TargetDir)\MttVDD"</Command>
+      <Command>copy "$(ProjectDir)option.txt" "$(TargetDir)\HdrVDD"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -266,8 +268,8 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
       <ExceptionHandling>Async</ExceptionHandling>
       <EnablePREfast>true</EnablePREfast>
-      <AdditionalOptions>/D_ATL_NO_WIN_SUPPORT /DUMDF_DRIVER /DIDDCX_VERSION_MAJOR=1 /DIDDCX_VERSION_MINOR=10 /DIDDCX_MINIMUM_VERSION_REQUIRED=3 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/D_ATL_NO_WIN_SUPPORT /DUMDF_DRIVER /DIDDCX_VERSION_MAJOR=1 /DIDDCX_VERSION_MINOR=10 /DIDDCX_MINIMUM_VERSION_REQUIRED=3 /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -277,7 +279,7 @@
       <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
     </DriverSign>
     <PostBuildEvent>
-      <Command>copy "$(ProjectDir)..\vdd_settings.xml" "$(TargetDir)\MttVDD"</Command>
+      <Command>copy "$(ProjectDir)option.txt" "$(TargetDir)\HdrVDD"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
@@ -311,8 +313,8 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
       <ExceptionHandling>Async</ExceptionHandling>
       <EnablePREfast>true</EnablePREfast>
-      <AdditionalOptions>/D_ATL_NO_WIN_SUPPORT /DUMDF_DRIVER /DIDDCX_VERSION_MAJOR=1 /DIDDCX_VERSION_MINOR=4 /DIDDCX_MINIMUM_VERSION_REQUIRED=4 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/D_ATL_NO_WIN_SUPPORT /DUMDF_DRIVER /DIDDCX_VERSION_MAJOR=1 /DIDDCX_VERSION_MINOR=4 /DIDDCX_MINIMUM_VERSION_REQUIRED=4 /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -322,7 +324,7 @@
       <FileDigestAlgorithm>SHA1</FileDigestAlgorithm>
     </DriverSign>
     <PostBuildEvent>
-      <Command>copy "$(ProjectDir)..\vdd_settings.xml" "$(TargetDir)\MttVDD"</Command>
+      <Command>copy "$(ProjectDir)option.txt" "$(TargetDir)\HdrVDD"</Command>
     </PostBuildEvent>
     <Inf>
       <DateStamp>10/16/2024</DateStamp>
@@ -335,8 +337,8 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
       <ExceptionHandling>Async</ExceptionHandling>
       <EnablePREfast>true</EnablePREfast>
-      <AdditionalOptions>/D_ATL_NO_WIN_SUPPORT /DUMDF_DRIVER /DIDDCX_VERSION_MAJOR=1 /DIDDCX_VERSION_MINOR=10 /DIDDCX_MINIMUM_VERSION_REQUIRED=3 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/D_ATL_NO_WIN_SUPPORT /DUMDF_DRIVER /DIDDCX_VERSION_MAJOR=1 /DIDDCX_VERSION_MINOR=10 /DIDDCX_MINIMUM_VERSION_REQUIRED=3 /utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(WindowsSdkDir)Include\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\wdf\umdf\$(UMDF_VERSION_MAJOR).$(UMDF_VERSION_MINOR);$(ProjectDir)..\ThirdParty\Windows-Driver-Frameworks\src\publicinc\wdf\umdf\2.15;$(ProjectDir)..\Common\Include;$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um\iddcx\$(IDDCX_VERSION_MAJOR).$(IDDCX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -346,7 +348,7 @@
       <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
     </DriverSign>
     <PostBuildEvent>
-      <Command>copy "$(ProjectDir)..\vdd_settings.xml" "$(TargetDir)\MttVDD"</Command>
+      <Command>copy "$(ProjectDir)option.txt" "$(TargetDir)\HdrVDD"</Command>
     </PostBuildEvent>
     <Inf>
       <DateStamp>10/16/2024</DateStamp>
@@ -359,8 +361,11 @@
     <None Include="readme.md" />
   </ItemGroup>
   <ItemGroup>
-    <Xml Include="..\vdd_settings.xml" />
+    <Text Include="option.txt" />
   </ItemGroup>
+   <ItemGroup>
+      <ResourceCompile Include="HdrVDD.rc" />
+    </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

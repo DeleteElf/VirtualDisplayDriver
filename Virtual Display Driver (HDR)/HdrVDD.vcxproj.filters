@@ -19,7 +19,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="MttVDD.inf">
+    <Inf Include="HdrVDD.inf">
       <Filter>Driver Files</Filter>
     </Inf>
   </ItemGroup>
@@ -40,8 +40,13 @@
     <None Include="readme.md" />
   </ItemGroup>
   <ItemGroup>
-    <Xml Include="..\vdd_settings.xml">
+    <Text Include="option.txt">
       <Filter>Resource Files</Filter>
-    </Xml>
+    </Text>
   </ItemGroup>
+  <ItemGroup>
+      <ResourceCompile Include="HdrVDD.rc">
+        <Filter>Resource Files</Filter>
+      </ResourceCompile>
+    </ItemGroup>
 </Project>

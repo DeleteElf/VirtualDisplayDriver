@@ -832,7 +832,7 @@ IDDCX_BITS_PER_COMPONENT SelectBitDepthFromColorSpace(const wstring& colorSpace)
     // Manual bit depth override
     if (forceBitDepth == L"8") {
         return IDDCX_BITS_PER_COMPONENT_8;
-    } else if (forceBitDepth == L"10") {
+	} else if (forceBitDepth == L"10") {
         return IDDCX_BITS_PER_COMPONENT_10;
     } else if (forceBitDepth == L"12") {
         return IDDCX_BITS_PER_COMPONENT_12;
