@@ -183,7 +183,7 @@ int main(int argc, char* argv[]) {
         std::wstring pipe = StringToWString(argv[1]);
         std::wstring command = StringToWString(argv[2]);
 //        std::wstring command = L"RELOAD_DRIVER";
-//        const wchar_t *kVddPipeName = L"\\\\.\\pipe\\ZeroVDD";
+//        const wchar_t *kVddPipeName = L"\\\\.\\pipe\\HdrVDD";
         std::string result;
 //        bool success = execute_pipe_command(kVddPipeName, command.c_str(), &result);
         bool success = execute_pipe_command(pipe.c_str(), command.c_str(), &result);

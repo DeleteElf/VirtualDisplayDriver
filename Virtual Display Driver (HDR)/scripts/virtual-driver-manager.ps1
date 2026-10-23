@@ -174,7 +174,7 @@ try {
         }
         # Fallback: If not found by name, use the more specific and stable Hardware ID.
         if (-not $device) {
-            $device = Get-PnpDevice -HardwareID "Root\ZeroVDD" -ErrorAction Silentlycontinue
+            $device = Get-PnpDevice -HardwareID "Root\HdrVDD" -ErrorAction Silentlycontinue
         }
         return $device
     }

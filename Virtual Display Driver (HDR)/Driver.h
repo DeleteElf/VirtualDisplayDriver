@@ -15,6 +15,7 @@
 #include <memory>
 #include <vector>
 #include <map>
+#include <mutex>
 #include <string>
 
 #include "Trace.h"
@@ -75,6 +76,19 @@ namespace Microsoft
             Microsoft::WRL::Wrappers::Event m_hTerminateEvent;
 
             IndirectMonitorContext* m_monitorContext;
+        };
+
+        /// <summary>
+        /// Custom comparator for LUID to be used in std::map
+        /// </summary>
+        struct LuidComparator
+        {
+            bool operator()(const LUID& a, const LUID& b) const
+            {
+                if (a.HighPart != b.HighPart)
+                    return a.HighPart < b.HighPart;
+                return a.LowPart < b.LowPart;
+            }
         };
 
         /// <summary>

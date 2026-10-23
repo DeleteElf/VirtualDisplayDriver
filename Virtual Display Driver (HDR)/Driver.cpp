@@ -290,6 +290,29 @@ const char* XorCursorSupportLevelToString(IDDCX_XOR_CURSOR_SUPPORT level) {
     }
 }
 
+#pragma region math
+
+int gcd(int a, int b) {
+    while (b != 0) {
+        int temp = b;
+        b = a % b;
+        a = temp;
+    }
+    return a;
+}
+
+void float_to_vsync(float refresh_rate, int& num, int& den) {
+    den = 10000;
+
+    num = static_cast<int>(round(refresh_rate * den));
+
+    int divisor = gcd(num, den);
+    num /= divisor;
+    den /= divisor;
+}
+
+#pragma endregion
+
 #pragma region log
 int logLevel = 3; //默认初始化一个日志级别为信息级
 CRITICAL_SECTION logSec;
@@ -400,6 +423,698 @@ void write_log(const char* level, const char* func, int line, const char* format
 
 #pragma endregion
 
+#pragma region edid
+const UINT64 MHZ = 1000000;
+const UINT64 KHZ = 1000;
+
+constexpr DISPLAYCONFIG_VIDEO_SIGNAL_INFO dispinfo(UINT32 h, UINT32 v, UINT32 rn, UINT32 rd) {
+    const UINT32 clock_rate = rn * (v + 4) * (v + 4) / rd + 1000;
+    return {
+        clock_rate,                                      // pixel clock rate [Hz]
+        { clock_rate, v + 4 },                         // fractional horizontal refresh rate [Hz]
+        { clock_rate, (v + 4) * (v + 4) },          // fractional vertical refresh rate [Hz]
+        { h, v },                                    // (horizontal, vertical) active pixel resolution
+        { h + 4, v + 4 },                         // (horizontal, vertical) total pixel resolution
+        { { 255, 0 }},                                   // video standard and vsync divider
+        DISPLAYCONFIG_SCANLINE_ORDERING_PROGRESSIVE
+    };
+}
+
+vector<BYTE> hardcodedEdid =
+{
+    0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x36, 0x94, 0x37, 0x13, 0xe7, 0x1e, 0xe7, 0x1e,
+    0x1c, 0x22, 0x01, 0x03, 0x80, 0x32, 0x1f, 0x78, 0x07, 0xee, 0x95, 0xa3, 0x54, 0x4c, 0x99, 0x26,
+    0x0f, 0x50, 0x54, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02, 0x3a, 0x80, 0x18, 0x71, 0x38, 0x2d, 0x40, 0x58, 0x2c,
+    0x45, 0x00, 0x63, 0xc8, 0x10, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0xfd, 0x00, 0x17, 0xf0, 0x0f,
+    0xff, 0x37, 0x00, 0x0a, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfc,
+    0x00, 0x56, 0x44, 0x44, 0x20, 0x62, 0x79, 0x20, 0x4d, 0x54, 0x54, 0x0a, 0x20, 0x20, 0x01, 0xc2,
+    0x02, 0x03, 0x20, 0x40, 0xe6, 0x06, 0x0d, 0x01, 0xa2, 0xa2, 0x10, 0xe3, 0x05, 0xd8, 0x00, 0x67,
+    0xd8, 0x5d, 0xc4, 0x01, 0x6e, 0x80, 0x00, 0x68, 0x03, 0x0c, 0x00, 0x00, 0x00, 0x30, 0x00, 0x0b,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x8c
+};
+
+void updateCeaExtensionCount(vector<BYTE>& edid, int count) {
+    edid[126] = static_cast<BYTE>(count);
+}
+//
+//vector<BYTE> loadEdid(const string& filePath) {
+//    if (customEdid) {
+//        LOG_INFO( "Attempting to use user Edid");
+//    }
+//    else {
+//        LOG_INFO( "Using hardcoded edid");
+//        return hardcodedEdid;
+//    }
+//
+//    ifstream file(filePath, ios::binary | ios::ate);
+//    if (!file) {
+//        LOG_INFO( "No custom edid found");
+//        LOG_INFO( "Using hardcoded edid");
+//        return hardcodedEdid;
+//    }
+//
+//    streamsize size = file.tellg();
+//    file.seekg(0, ios::beg);
+//
+//    vector<BYTE> buffer(size);
+//    if (file.read((char*)buffer.data(), size)) {
+//        //calculate checksum and compare it to 127 byte, if false then return hardcoded if true then return buffer to prevent loading borked edid.
+//        BYTE calculatedChecksum = calculateChecksum(buffer);
+//        if (calculatedChecksum != buffer[127]) {
+//            LOG_ERROR( "Custom edid failed due to invalid checksum");
+//            LOG_INFO( "Using hardcoded edid");
+//            return hardcodedEdid;
+//        }
+//
+//        if (edidCeaOverride) {
+//            if (buffer.size() == 256) {
+//                for (int i = 128; i < 256; ++i) {
+//                    buffer[i] = hardcodedEdid[i];
+//                }
+//                updateCeaExtensionCount(buffer, 1);
+//            }
+//            else if (buffer.size() == 128) {
+//                buffer.insert(buffer.end(), hardcodedEdid.begin() + 128, hardcodedEdid.end());
+//                updateCeaExtensionCount(buffer, 1);
+//            }
+//        }
+//
+//        LOG_INFO( "Using custom edid");
+//        return buffer;
+//    }
+//    else {
+//        LOG_INFO( "Using hardcoded edid");
+//        return hardcodedEdid;
+//    }
+//}
+//
+//int maincalc() {
+//    vector<BYTE> edid = loadEdid(WStringToString(confpath) + "\\user_edid.bin");
+//
+//    if (!preventManufacturerSpoof) modifyEdid(edid);
+//    BYTE checksum = calculateChecksum(edid);
+//    edid[127] = checksum;
+//    // Setting this variable is depricated, hardcoded edid is either returned or custom in loading edid function
+//    IndirectDeviceContext::s_KnownMonitorEdid = edid;
+//    return 0;
+//}
+//
+//
+//// Generate modes from EDID with advanced filtering and optimization
+//vector<tuple<int, int, int, int>> GenerateModesFromEdid(const EdidProfileData& profile) {
+//    vector<tuple<int, int, int, int>> generatedModes;
+//
+//    if (!autoResolutionsEnabled) {
+//        LOG_INFO( "Auto resolutions disabled, skipping EDID mode generation");
+//        return generatedModes;
+//    }
+//
+//    for (const auto& mode : profile.modes) {
+//        int width = get<0>(mode);
+//        int height = get<1>(mode);
+//        int refreshRateMultiplier = get<2>(mode);
+//        int nominalRefreshRate = get<3>(mode);
+//
+//        // Apply comprehensive filtering
+//        bool passesFilter = true;
+//
+//        // Resolution range filtering
+//        if (width < minResolutionWidth || width > maxResolutionWidth ||
+//            height < minResolutionHeight || height > maxResolutionHeight) {
+//            passesFilter = false;
+//        }
+//
+//        // Refresh rate filtering
+//        if (nominalRefreshRate < minRefreshRate || nominalRefreshRate > maxRefreshRate) {
+//            passesFilter = false;
+//        }
+//
+//        // Fractional rate filtering
+//        if (excludeFractionalRates && refreshRateMultiplier != 1000) {
+//            passesFilter = false;
+//        }
+//
+//        // Add custom quality filtering
+//        if (passesFilter) {
+//            // Prefer standard aspect ratios for better compatibility
+//            double aspectRatio = static_cast<double>(width) / height;
+//            bool isStandardAspect = (abs(aspectRatio - 16.0/9.0) < 0.01) ||  // 16:9
+//                                    (abs(aspectRatio - 16.0/10.0) < 0.01) ||  // 16:10
+//                                    (abs(aspectRatio - 4.0/3.0) < 0.01) ||    // 4:3
+//                                    (abs(aspectRatio - 21.0/9.0) < 0.01);     // 21:9
+//
+//            // Log non-standard aspect ratios for information
+//            if (!isStandardAspect) {
+//                stringstream ss;
+//                ss << "Including non-standard aspect ratio mode: " << width << "x" << height
+//                   << " (ratio: " << fixed << setprecision(2) << aspectRatio << ")";
+//                LOG_DEBUG( ss.str().c_str());
+//            }
+//
+//            generatedModes.push_back(mode);
+//        }
+//    }
+//
+//    // Sort modes by preference (resolution, then refresh rate)
+//    sort(generatedModes.begin(), generatedModes.end(),
+//         [](const tuple<int, int, int, int>& a, const tuple<int, int, int, int>& b) {
+//             // Primary sort: resolution (area)
+//             int areaA = get<0>(a) * get<1>(a);
+//             int areaB = get<0>(b) * get<1>(b);
+//             if (areaA != areaB) return areaA > areaB;  // Larger resolution first
+//
+//             // Secondary sort: refresh rate
+//             return get<3>(a) > get<3>(b);  // Higher refresh rate first
+//         });
+//
+//    stringstream ss;
+//    ss << "Generated " << generatedModes.size() << " modes from EDID (filtered from " << profile.modes.size() << " total)";
+//    LOG_INFO( ss.str().c_str());
+//
+//    return generatedModes;
+//}
+//
+//// Find and validate preferred mode from EDID
+//tuple<int, int, int, int> FindPreferredModeFromEdid(const EdidProfileData& profile,
+//                                                    const vector<tuple<int, int, int, int>>& availableModes) {
+//    // Default fallback mode
+//    tuple<int, int, int, int> preferredMode = make_tuple(fallbackWidth, fallbackHeight, 1000, fallbackRefresh);
+//
+//    if (!useEdidPreferred) {
+//        LOG_INFO( "EDID preferred mode disabled, using fallback");
+//        return preferredMode;
+//    }
+//
+//    // Look for EDID preferred mode in available modes
+//    for (const auto& mode : availableModes) {
+//        if (get<0>(mode) == profile.preferredWidth &&
+//            get<1>(mode) == profile.preferredHeight) {
+//            // Found matching resolution, use it
+//            preferredMode = mode;
+//
+//            stringstream ss;
+//            ss << "Found EDID preferred mode: " << profile.preferredWidth << "x" << profile.preferredHeight
+//               << "@" << get<3>(mode) << "Hz";
+//            LOG_INFO( ss.str().c_str());
+//            break;
+//        }
+//    }
+//
+//    return preferredMode;
+//}
+//
+//// Merge and optimize mode lists
+//vector<tuple<int, int, int, int>> MergeAndOptimizeModes(const vector<tuple<int, int, int, int>>& manualModes,
+//                                                        const vector<tuple<int, int, int, int>>& edidModes) {
+//    vector<tuple<int, int, int, int>> mergedModes;
+//
+//    if (sourcePriority == L"edid") {
+//        mergedModes = edidModes;
+//        LOG_INFO( "Using EDID-only mode list");
+//    }
+//    else if (sourcePriority == L"manual") {
+//        mergedModes = manualModes;
+//        LOG_INFO( "Using manual-only mode list");
+//    }
+//    else if (sourcePriority == L"combined") {
+//        // Start with manual modes
+//        mergedModes = manualModes;
+//
+//        // Add EDID modes that don't duplicate manual modes
+//        for (const auto& edidMode : edidModes) {
+//            bool isDuplicate = false;
+//            for (const auto& manualMode : manualModes) {
+//                if (get<0>(edidMode) == get<0>(manualMode) &&
+//                    get<1>(edidMode) == get<1>(manualMode) &&
+//                    get<3>(edidMode) == get<3>(manualMode)) {
+//                    isDuplicate = true;
+//                    break;
+//                }
+//            }
+//            if (!isDuplicate) {
+//                mergedModes.push_back(edidMode);
+//            }
+//        }
+//
+//        stringstream ss;
+//        ss << "Combined modes: " << manualModes.size() << " manual + "
+//           << (mergedModes.size() - manualModes.size()) << " unique EDID = " << mergedModes.size() << " total";
+//        LOG_INFO( ss.str().c_str());
+//    }
+//
+//    return mergedModes;
+//}
+//
+//// Optimize mode list for performance and compatibility
+//vector<tuple<int, int, int, int>> OptimizeModeList(const vector<tuple<int, int, int, int>>& modes,
+//                                                   const tuple<int, int, int, int>& preferredMode) {
+//    vector<tuple<int, int, int, int>> optimizedModes = modes;
+//
+//    // Remove preferred mode from list if it exists, we'll add it at the front
+//    optimizedModes.erase(
+//            remove_if(optimizedModes.begin(), optimizedModes.end(),
+//                      [&preferredMode](const tuple<int, int, int, int>& mode) {
+//                          return get<0>(mode) == get<0>(preferredMode) &&
+//                                 get<1>(mode) == get<1>(preferredMode) &&
+//                                 get<3>(mode) == get<3>(preferredMode);
+//                      }),
+//            optimizedModes.end());
+//
+//    // Insert preferred mode at the beginning
+//    optimizedModes.insert(optimizedModes.begin(), preferredMode);
+//
+//    // Remove duplicate modes (same resolution and refresh rate)
+//    sort(optimizedModes.begin(), optimizedModes.end());
+//    optimizedModes.erase(unique(optimizedModes.begin(), optimizedModes.end(),
+//                                [](const tuple<int, int, int, int>& a, const tuple<int, int, int, int>& b) {
+//                                    return get<0>(a) == get<0>(b) &&
+//                                           get<1>(a) == get<1>(b) &&
+//                                           get<3>(a) == get<3>(b);
+//                                }),
+//                         optimizedModes.end());
+//
+//    // Limit total number of modes for performance (Windows typically supports 20-50 modes)
+//    const size_t maxModes = 32;
+//    if (optimizedModes.size() > maxModes) {
+//        optimizedModes.resize(maxModes);
+//        stringstream ss;
+//        ss << "Limited mode list to " << maxModes << " modes for optimal performance";
+//        LOG_INFO( ss.str().c_str());
+//    }
+//
+//    return optimizedModes;
+//}
+//
+//// Enhanced mode validation with detailed reporting
+//bool ValidateModeList(const vector<tuple<int, int, int, int>>& modes) {
+//    if (modes.empty()) {
+//        LOG_ERROR( "Mode list is empty - this will cause display driver failure");
+//        return false;
+//    }
+//
+//    stringstream validationReport;
+//    validationReport << "=== MODE LIST VALIDATION REPORT ===\n"
+//                     << "Total modes: " << modes.size() << "\n";
+//
+//    // Analyze resolution distribution
+//    map<pair<int, int>, int> resolutionCount;
+//    map<int, int> refreshRateCount;
+//
+//    for (const auto& mode : modes) {
+//        pair<int, int> resolution = {get<0>(mode), get<1>(mode)};
+//        resolutionCount[resolution]++;
+//        refreshRateCount[get<3>(mode)]++;
+//    }
+//
+//    validationReport << "Unique resolutions: " << resolutionCount.size() << "\n";
+//    validationReport << "Unique refresh rates: " << refreshRateCount.size() << "\n";
+//    validationReport << "Preferred mode: " << get<0>(modes[0]) << "x" << get<1>(modes[0])
+//                     << "@" << get<3>(modes[0]) << "Hz";
+//
+//    LOG_INFO( validationReport.str().c_str());
+//
+//    return true;
+//}
+//
+//bool LoadEdidProfile(const wstring& profilePath, EdidProfileData& profile) {
+//    wstring fullPath = confpath + L"\\" + profilePath;
+//
+//    // Check if file exists
+//    if (!PathFileExistsW(fullPath.c_str())) {
+//        vddlog("w", ("EDID profile not found: " + WStringToString(fullPath)).c_str());
+//        return false;
+//    }
+//
+//    CComPtr<IStream> pStream;
+//    CComPtr<IXmlReader> pReader;
+//    HRESULT hr = SHCreateStreamOnFileW(fullPath.c_str(), STGM_READ, &pStream);
+//    if (FAILED(hr)) {
+//        LOG_ERROR( "LoadEdidProfile: Failed to create file stream.");
+//        return false;
+//    }
+//
+//    hr = CreateXmlReader(__uuidof(IXmlReader), (void**)&pReader, NULL);
+//    if (FAILED(hr)) {
+//        LOG_ERROR( "LoadEdidProfile: Failed to create XmlReader.");
+//        return false;
+//    }
+//
+//    hr = pReader->SetInput(pStream);
+//    if (FAILED(hr)) {
+//        LOG_ERROR( "LoadEdidProfile: Failed to set input stream.");
+//        return false;
+//    }
+//
+//    XmlNodeType nodeType;
+//    const WCHAR* pwszLocalName;
+//    const WCHAR* pwszValue;
+//    UINT cwchLocalName;
+//    UINT cwchValue;
+//    wstring currentElement;
+//    wstring currentSection;
+//
+//    // Temporary mode data
+//    int tempWidth = 0, tempHeight = 0, tempRefreshRateMultiplier = 1000, tempNominalRefreshRate = 60;
+//
+//    while (S_OK == (hr = pReader->Read(&nodeType))) {
+//        switch (nodeType) {
+//            case XmlNodeType_Element:
+//                hr = pReader->GetLocalName(&pwszLocalName, &cwchLocalName);
+//                if (FAILED(hr)) return false;
+//                currentElement = wstring(pwszLocalName, cwchLocalName);
+//
+//                // Track sections for context
+//                if (currentElement == L"MonitorModes" || currentElement == L"HDRCapabilities" ||
+//                    currentElement == L"ColorProfile" || currentElement == L"PreferredMode") {
+//                    currentSection = currentElement;
+//                }
+//                break;
+//
+//            case XmlNodeType_Text:
+//                hr = pReader->GetValue(&pwszValue, &cwchValue);
+//                if (FAILED(hr)) return false;
+//
+//                wstring value = wstring(pwszValue, cwchValue);
+//
+//                // Parse monitor modes
+//                if (currentSection == L"MonitorModes") {
+//                    if (currentElement == L"Width") {
+//                        tempWidth = stoi(value);
+//                    }
+//                    else if (currentElement == L"Height") {
+//                        tempHeight = stoi(value);
+//                    }
+//                    else if (currentElement == L"RefreshRateMultiplier") {
+//                        tempRefreshRateMultiplier = stoi(value);
+//                    }
+//                    else if (currentElement == L"NominalRefreshRate") {
+//                        tempNominalRefreshRate = stoi(value);
+//                        // Complete mode entry
+//                        if (tempWidth > 0 && tempHeight > 0) {
+//                            profile.modes.push_back(make_tuple(tempWidth, tempHeight, tempRefreshRateMultiplier, tempNominalRefreshRate));
+//                            stringstream ss;
+//                            ss << "EDID Mode: " << tempWidth << "x" << tempHeight << " @ " << tempRefreshRateMultiplier << "/" << tempNominalRefreshRate << "Hz";
+//                            LOG_DEBUG( ss.str().c_str());
+//                        }
+//                    }
+//                }
+//                    // Parse HDR capabilities
+//                else if (currentSection == L"HDRCapabilities") {
+//                    if (currentElement == L"HDR10Supported") {
+//                        profile.hdr10Supported = (value == L"true");
+//                    }
+//                    else if (currentElement == L"DolbyVisionSupported") {
+//                        profile.dolbyVisionSupported = (value == L"true");
+//                    }
+//                    else if (currentElement == L"HDR10PlusSupported") {
+//                        profile.hdr10PlusSupported = (value == L"true");
+//                    }
+//                    else if (currentElement == L"MaxLuminance") {
+//                        profile.maxLuminance = stod(value);
+//                    }
+//                    else if (currentElement == L"MinLuminance") {
+//                        profile.minLuminance = stod(value);
+//                    }
+//                }
+//                    // Parse color profile
+//                else if (currentSection == L"ColorProfile") {
+//                    if (currentElement == L"PrimaryColorSpace") {
+//                        profile.primaryColorSpace = value;
+//                    }
+//                    else if (currentElement == L"Gamma") {
+//                        profile.gamma = stod(value);
+//                    }
+//                    else if (currentElement == L"RedX") {
+//                        profile.redX = stod(value);
+//                    }
+//                    else if (currentElement == L"RedY") {
+//                        profile.redY = stod(value);
+//                    }
+//                    else if (currentElement == L"GreenX") {
+//                        profile.greenX = stod(value);
+//                    }
+//                    else if (currentElement == L"GreenY") {
+//                        profile.greenY = stod(value);
+//                    }
+//                    else if (currentElement == L"BlueX") {
+//                        profile.blueX = stod(value);
+//                    }
+//                    else if (currentElement == L"BlueY") {
+//                        profile.blueY = stod(value);
+//                    }
+//                    else if (currentElement == L"WhiteX") {
+//                        profile.whiteX = stod(value);
+//                    }
+//                    else if (currentElement == L"WhiteY") {
+//                        profile.whiteY = stod(value);
+//                    }
+//                }
+//                    // Parse preferred mode
+//                else if (currentSection == L"PreferredMode") {
+//                    if (currentElement == L"Width") {
+//                        profile.preferredWidth = stoi(value);
+//                    }
+//                    else if (currentElement == L"Height") {
+//                        profile.preferredHeight = stoi(value);
+//                    }
+//                    else if (currentElement == L"RefreshRate") {
+//                        profile.preferredRefresh = stod(value);
+//                    }
+//                }
+//                break;
+//        }
+//    }
+//
+//    stringstream ss;
+//    ss << "EDID Profile loaded: " << profile.modes.size() << " modes, HDR10: " << (profile.hdr10Supported ? "Yes" : "No")
+//       << ", Color space: " << WStringToString(profile.primaryColorSpace);
+//    LOG_INFO( ss.str().c_str());
+//
+//    return true;
+//}
+//
+//bool ApplyEdidProfile(const EdidProfileData& profile) {
+//    if (!edidIntegrationEnabled) {
+//        return false;
+//    }
+//
+//    // === ENHANCED MODE MANAGEMENT ===
+//    if (autoResolutionsEnabled) {
+//        // Store original manual modes
+//        vector<tuple<int, int, int, int>> originalModes = monitorModes;
+//
+//        // Generate optimized modes from EDID
+//        vector<tuple<int, int, int, int>> edidModes = GenerateModesFromEdid(profile);
+//
+//        // Find preferred mode from EDID
+//        tuple<int, int, int, int> preferredMode = FindPreferredModeFromEdid(profile, edidModes);
+//
+//        // Merge and optimize mode lists
+//        vector<tuple<int, int, int, int>> finalModes = MergeAndOptimizeModes(originalModes, edidModes);
+//
+//        // Optimize final mode list with preferred mode priority
+//        finalModes = OptimizeModeList(finalModes, preferredMode);
+//
+//        // Validate the final mode list
+//        if (ValidateModeList(finalModes)) {
+//            monitorModes = finalModes;
+//            RebuildKnownMonitorModesCache();
+//
+//            stringstream ss;
+//            ss << "Enhanced mode management completed:\n"
+//               << "  Original manual modes: " << originalModes.size() << "\n"
+//               << "  Generated EDID modes: " << edidModes.size() << "\n"
+//               << "  Final optimized modes: " << finalModes.size() << "\n"
+//               << "  Preferred mode: " << get<0>(preferredMode) << "x" << get<1>(preferredMode)
+//               << "@" << get<3>(preferredMode) << "Hz\n"
+//               << "  Source priority: " << WStringToString(sourcePriority);
+//            LOG_INFO( ss.str().c_str());
+//        } else {
+//            LOG_ERROR( "Mode list validation failed, keeping original modes");
+//        }
+//    }
+//
+//    // Apply HDR settings if configured
+//    if (hdr10StaticMetadataEnabled && profile.hdr10Supported) {
+//        if (overrideManualSettings || maxDisplayMasteringLuminance == 1000.0) { // Default value
+//            maxDisplayMasteringLuminance = profile.maxLuminance;
+//        }
+//        if (overrideManualSettings || minDisplayMasteringLuminance == 0.05) { // Default value
+//            minDisplayMasteringLuminance = profile.minLuminance;
+//        }
+//    }
+//
+//    // Apply color primaries if configured
+//    if (colorPrimariesEnabled && (overrideManualSettings || redX == 0.708)) { // Default Rec.2020 values
+//        redX = profile.redX;
+//        redY = profile.redY;
+//        greenX = profile.greenX;
+//        greenY = profile.greenY;
+//        blueX = profile.blueX;
+//        blueY = profile.blueY;
+//        whiteX = profile.whiteX;
+//        whiteY = profile.whiteY;
+//    }
+//
+//    // Apply color space settings
+//    if (colorSpaceEnabled && (overrideManualSettings || primaryColorSpace == L"sRGB")) { // Default value
+//        primaryColorSpace = profile.primaryColorSpace;
+//        gammaCorrection = profile.gamma;
+//    }
+//
+//    // Generate and store HDR metadata for all monitors if HDR is enabled
+//    if (hdr10StaticMetadataEnabled && profile.hdr10Supported) {
+//        VddHdrMetadata hdrMetadata = ConvertEdidToSmpteMetadata(profile);
+//
+//        if (hdrMetadata.isValid) {
+//            // Store metadata for future monitor creation
+//            // Note: We don't have monitor handles yet at this point, so we'll store it as a template
+//            // The actual association will happen when monitors are created or HDR metadata is requested
+//
+//            stringstream ss;
+//            ss << "Generated SMPTE ST.2086 HDR metadata from EDID profile:\n"
+//               << "  Red: (" << hdrMetadata.display_primaries_x[0] << ", " << hdrMetadata.display_primaries_y[0] << ") "
+//               << "→ (" << profile.redX << ", " << profile.redY << ")\n"
+//               << "  Green: (" << hdrMetadata.display_primaries_x[1] << ", " << hdrMetadata.display_primaries_y[1] << ") "
+//               << "→ (" << profile.greenX << ", " << profile.greenY << ")\n"
+//               << "  Blue: (" << hdrMetadata.display_primaries_x[2] << ", " << hdrMetadata.display_primaries_y[2] << ") "
+//               << "→ (" << profile.blueX << ", " << profile.blueY << ")\n"
+//               << "  White Point: (" << hdrMetadata.white_point_x << ", " << hdrMetadata.white_point_y << ") "
+//               << "→ (" << profile.whiteX << ", " << profile.whiteY << ")\n"
+//               << "  Max Luminance: " << hdrMetadata.max_display_mastering_luminance
+//               << " (" << profile.maxLuminance << " nits)\n"
+//               << "  Min Luminance: " << hdrMetadata.min_display_mastering_luminance
+//               << " (" << profile.minLuminance << " nits)";
+//            LOG_INFO( ss.str().c_str());
+//
+//            // Store as template metadata - will be applied to monitors during HDR metadata events
+//            // We use a special key (nullptr converted to uintptr_t) to indicate template metadata
+//            g_HdrMetadataStore[reinterpret_cast<IDDCX_MONITOR>(0)] = hdrMetadata;
+//        } else {
+//            vddlog("w", "Generated HDR metadata is not valid, skipping storage");
+//        }
+//    }
+//
+//    // Generate and store gamma ramp for color space processing if enabled
+//    if (colorSpaceEnabled) {
+//        VddGammaRamp gammaRamp = ConvertEdidToGammaRamp(profile);
+//
+//        if (gammaRamp.isValid) {
+//            // Store gamma ramp as template for future monitor creation
+//            stringstream ss;
+//            ss << "Generated Gamma Ramp from EDID profile:\n"
+//               << "  Gamma: " << gammaRamp.gamma << " (from " << profile.gamma << ")\n"
+//               << "  Color Space: " << WStringToString(gammaRamp.colorSpace) << "\n"
+//               << "  Matrix Transform: " << (gammaRamp.useMatrix ? "Enabled" : "Disabled");
+//
+//            if (gammaRamp.useMatrix) {
+//                ss << "\n  3x4 Matrix:\n"
+//                   << "    [" << gammaRamp.matrix.matrix[0][0] << ", " << gammaRamp.matrix.matrix[0][1] << ", " << gammaRamp.matrix.matrix[0][2] << ", " << gammaRamp.matrix.matrix[0][3] << "]\n"
+//                   << "    [" << gammaRamp.matrix.matrix[1][0] << ", " << gammaRamp.matrix.matrix[1][1] << ", " << gammaRamp.matrix.matrix[1][2] << ", " << gammaRamp.matrix.matrix[1][3] << "]\n"
+//                   << "    [" << gammaRamp.matrix.matrix[2][0] << ", " << gammaRamp.matrix.matrix[2][1] << ", " << gammaRamp.matrix.matrix[2][2] << ", " << gammaRamp.matrix.matrix[2][3] << "]";
+//            }
+//
+//            LOG_INFO( ss.str().c_str());
+//
+//            // Store as template gamma ramp - will be applied to monitors during gamma ramp events
+//            // We use a special key (nullptr converted to uintptr_t) to indicate template gamma ramp
+//            g_GammaRampStore[reinterpret_cast<IDDCX_MONITOR>(0)] = gammaRamp;
+//        } else {
+//            vddlog("w", "Generated gamma ramp is not valid, skipping storage");
+//        }
+//    }
+//
+//    return true;
+//}
+
+#pragma endregion
+
+#pragma region d3dDeviceCache
+std::map<LUID, std::shared_ptr<Direct3DDevice>, Microsoft::IndirectDisp::LuidComparator> s_DeviceCache;
+std::mutex s_DeviceCacheMutex;
+std::shared_ptr<Direct3DDevice> GetOrCreateDevice(LUID RenderAdapter)
+{
+    std::shared_ptr<Direct3DDevice> Device;
+    stringstream logStream;
+
+    logStream << "GetOrCreateDevice called for LUID: " << RenderAdapter.HighPart << "-" << RenderAdapter.LowPart;
+    LOG_DEBUG( logStream.str().c_str());
+
+    {
+        std::lock_guard<std::mutex> lock(s_DeviceCacheMutex);
+
+        logStream.str("");
+        logStream << "Device cache size: " << s_DeviceCache.size();
+        LOG_DEBUG( logStream.str().c_str());
+
+        auto it = s_DeviceCache.find(RenderAdapter);
+        if (it != s_DeviceCache.end()) {
+            Device = it->second;
+            if (Device) {
+                logStream.str("");
+                logStream << "Reusing cached Direct3DDevice for LUID " << RenderAdapter.HighPart << "-" << RenderAdapter.LowPart;
+                LOG_DEBUG( logStream.str().c_str());
+                return Device;
+            } else {
+                logStream.str("");
+                logStream << "Cached Direct3DDevice is null for LUID " << RenderAdapter.HighPart << "-" << RenderAdapter.LowPart << ", removing from cache";
+                LOG_DEBUG( logStream.str().c_str());
+                s_DeviceCache.erase(it);
+            }
+        }
+    }
+
+    logStream.str("");
+    logStream << "Creating new Direct3DDevice for LUID " << RenderAdapter.HighPart << "-" << RenderAdapter.LowPart;
+    LOG_DEBUG( logStream.str().c_str());
+
+    Device = make_shared<Direct3DDevice>(RenderAdapter);
+    if (FAILED(Device->Init())) {
+        LOG_ERROR( "Failed to initialize new Direct3DDevice");
+        return nullptr;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(s_DeviceCacheMutex);
+        s_DeviceCache[RenderAdapter] = Device;
+        logStream.str("");
+        logStream << "Created and cached new Direct3DDevice for LUID " << RenderAdapter.HighPart << "-" << RenderAdapter.LowPart << " (cache size now: " << s_DeviceCache.size() << ")";
+        LOG_DEBUG( logStream.str().c_str());
+    }
+
+    return Device;
+}
+
+void CleanupExpiredDevices()
+{
+    std::lock_guard<std::mutex> lock(s_DeviceCacheMutex);
+
+    int removed = 0;
+    for (auto it = s_DeviceCache.begin(); it != s_DeviceCache.end();) {
+        // With shared_ptr cache, we only remove null devices (shouldn't happen)
+        if (!it->second) {
+            it = s_DeviceCache.erase(it);
+            removed++;
+        } else {
+            ++it;
+        }
+    }
+
+    if (removed > 0) {
+        stringstream logStream;
+        logStream << "Cleaned up " << removed << " null Direct3DDevice references from cache";
+        LOG_DEBUG( logStream.str().c_str());
+    }
+}
+
+#pragma endregion
 
 struct IndirectDeviceContextWrapper
 {
@@ -736,6 +1451,17 @@ const BYTE defaultEdid[256] = {
 //    edid[11] = 0x1A; //product_id 高位
 //}
 
+//void modifyEdid(vector<BYTE>& edid,UINT displayIndex=0) {
+//    if (edid.size() < 12) {
+//        return;
+//    }
+//    edid[8] = 0x36;
+//    edid[9] = 0x94;
+//    edid[10] = 0x37+displayIndex ;
+//    edid[11] = 0x13;
+//}
+
+
 BYTE calculateChecksum(const char* edid) {
     int sum = 0;
     for (int i = 0; i < 127; ++i) {
@@ -747,7 +1473,19 @@ BYTE calculateChecksum(const char* edid) {
     }
     return static_cast<BYTE>(sum);
 }
-
+BYTE calculateChecksum(const std::vector<BYTE>& edid) {
+    int sum = 0;
+    for (int i = 0; i < 127; ++i) {
+        sum += edid[i];
+    }
+    sum %= 256;
+    if (sum != 0) {
+        sum = 256 - sum;
+    }
+    return static_cast<BYTE>(sum);
+    // check sum calculations. We dont need to include old checksum in calculation, so we only read up to the byte before.
+    // Anything after the checksum bytes arent part of the checksum - a flaw with edid managment, not with us
+}
 /// <summary>
 /// 默认分辨率
 /// </summary>
@@ -806,10 +1544,7 @@ const SIZE defaultDisplayResolution[] =
 /// <summary>
 /// 默认的显示刷新率
 /// </summary>
-const UINT defaultDisplayFps[] =
-        {
-                60
-        };
+const UINT defaultDisplayFps[] = { 60 };
 
 bool parseSizePerLine(const char* line, SIZE& size)
 {
@@ -845,7 +1580,6 @@ void init() {
         }
     }
     IOHelper::checkAndCreateDirectory(configPath);//如果目录不存在，则创建目录
-    //logFile = StringToWString( IOHelper::pathCombine(configPath, logFilename));
     logFile = IOHelper::pathCombine(configPath, LOG_FILE_NAME);
     LOG_DEBUG("日志创建成功！");
 
@@ -1530,6 +2264,110 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT  pDriverObject,PUNICODE_STRING pR
     Config.EvtDriverUnload = EvtDriverUnload; //注册驱动卸载事件
 
     //todo：MttVdd 在这里做了大量的配置初始化，我们使用上面的init来初始化即可
+
+    //customEdid = EnabledQuery(L"CustomEdidEnabled");
+    //preventManufacturerSpoof = EnabledQuery(L"PreventMonitorSpoof");
+    //edidCeaOverride = EnabledQuery(L"EdidCeaOverride");
+    //sendLogsThroughPipe = EnabledQuery(L"SendLogsThroughPipe");
+
+
+    ////colour
+    //HDRPlus = EnabledQuery(L"HDRPlusEnabled");
+    //SDR10 = EnabledQuery(L"SDR10Enabled");
+    //HDRCOLOUR = HDRPlus ? IDDCX_BITS_PER_COMPONENT_12 : IDDCX_BITS_PER_COMPONENT_10;
+    //SDRCOLOUR = SDR10 ? IDDCX_BITS_PER_COMPONENT_10 : IDDCX_BITS_PER_COMPONENT_8;
+    //ColourFormat = GetStringSetting(L"ColourFormat");
+
+    ////Cursor
+    //hardwareCursor = EnabledQuery(L"HardwareCursorEnabled");
+    //alphaCursorSupport = EnabledQuery(L"AlphaCursorSupport");
+    //CursorMaxX = GetIntegerSetting(L"CursorMaxX");
+    //CursorMaxY = GetIntegerSetting(L"CursorMaxY");
+
+    //int xorCursorSupportLevelInt = GetIntegerSetting(L"XorCursorSupportLevel");
+    //std::string xorCursorSupportLevelName;
+
+    //if (xorCursorSupportLevelInt < 0 || xorCursorSupportLevelInt > 3) {
+    //    vddlog("w", "Selected Xor Level unsupported, defaulting to IDDCX_XOR_CURSOR_SUPPORT_FULL");
+    //    XorCursorSupportLevel = IDDCX_XOR_CURSOR_SUPPORT_FULL;
+    //}
+    //else {
+    //    XorCursorSupportLevel = static_cast<IDDCX_XOR_CURSOR_SUPPORT>(xorCursorSupportLevelInt);
+    //}
+
+    //// === LOAD NEW EDID INTEGRATION SETTINGS ===
+    //edidIntegrationEnabled = EnabledQuery(L"EdidIntegrationEnabled");
+    //autoConfigureFromEdid = EnabledQuery(L"AutoConfigureFromEdid");
+    //edidProfilePath = GetStringSetting(L"EdidProfilePath");
+    //overrideManualSettings = EnabledQuery(L"OverrideManualSettings");
+    //fallbackOnError = EnabledQuery(L"FallbackOnError");
+
+    //// === LOAD HDR ADVANCED SETTINGS ===
+    //hdr10StaticMetadataEnabled = EnabledQuery(L"Hdr10StaticMetadataEnabled");
+    //maxDisplayMasteringLuminance = GetDoubleSetting(L"MaxDisplayMasteringLuminance");
+    //minDisplayMasteringLuminance = GetDoubleSetting(L"MinDisplayMasteringLuminance");
+    //maxContentLightLevel = GetIntegerSetting(L"MaxContentLightLevel");
+    //maxFrameAvgLightLevel = GetIntegerSetting(L"MaxFrameAvgLightLevel");
+
+    //colorPrimariesEnabled = EnabledQuery(L"ColorPrimariesEnabled");
+    //redX = GetDoubleSetting(L"RedX");
+    //redY = GetDoubleSetting(L"RedY");
+    //greenX = GetDoubleSetting(L"GreenX");
+    //greenY = GetDoubleSetting(L"GreenY");
+    //blueX = GetDoubleSetting(L"BlueX");
+    //blueY = GetDoubleSetting(L"BlueY");
+    //whiteX = GetDoubleSetting(L"WhiteX");
+    //whiteY = GetDoubleSetting(L"WhiteY");
+
+    //colorSpaceEnabled = EnabledQuery(L"ColorSpaceEnabled");
+    //gammaCorrection = GetDoubleSetting(L"GammaCorrection");
+    //primaryColorSpace = GetStringSetting(L"PrimaryColorSpace");
+    //enableMatrixTransform = EnabledQuery(L"EnableMatrixTransform");
+
+    //// === LOAD AUTO RESOLUTIONS SETTINGS ===
+    //autoResolutionsEnabled = EnabledQuery(L"AutoResolutionsEnabled");
+    //sourcePriority = GetStringSetting(L"SourcePriority");
+    //minRefreshRate = GetIntegerSetting(L"MinRefreshRate");
+    //maxRefreshRate = GetIntegerSetting(L"MaxRefreshRate");
+    //excludeFractionalRates = EnabledQuery(L"ExcludeFractionalRates");
+    //minResolutionWidth = GetIntegerSetting(L"MinResolutionWidth");
+    //minResolutionHeight = GetIntegerSetting(L"MinResolutionHeight");
+    //maxResolutionWidth = GetIntegerSetting(L"MaxResolutionWidth");
+    //maxResolutionHeight = GetIntegerSetting(L"MaxResolutionHeight");
+    //useEdidPreferred = EnabledQuery(L"UseEdidPreferred");
+    //fallbackWidth = GetIntegerSetting(L"FallbackWidth");
+    //fallbackHeight = GetIntegerSetting(L"FallbackHeight");
+    //fallbackRefresh = GetIntegerSetting(L"FallbackRefresh");
+
+    //// === LOAD COLOR ADVANCED SETTINGS ===
+    //autoSelectFromColorSpace = EnabledQuery(L"AutoSelectFromColorSpace");
+    //forceBitDepth = GetStringSetting(L"ForceBitDepth");
+    //fp16SurfaceSupport = EnabledQuery(L"Fp16SurfaceSupport");
+    //wideColorGamut = EnabledQuery(L"WideColorGamut");
+    //hdrToneMapping = EnabledQuery(L"HdrToneMapping");
+    //sdrWhiteLevel = GetDoubleSetting(L"SdrWhiteLevel");
+
+    //// === LOAD MONITOR EMULATION SETTINGS ===
+    //monitorEmulationEnabled = EnabledQuery(L"MonitorEmulationEnabled");
+    //emulatePhysicalDimensions = EnabledQuery(L"EmulatePhysicalDimensions");
+    //physicalWidthMm = GetIntegerSetting(L"PhysicalWidthMm");
+    //physicalHeightMm = GetIntegerSetting(L"PhysicalHeightMm");
+    //manufacturerEmulationEnabled = EnabledQuery(L"ManufacturerEmulationEnabled");
+    //manufacturerName = GetStringSetting(L"ManufacturerName");
+    //modelName = GetStringSetting(L"ModelName");
+    //serialNumber = GetStringSetting(L"SerialNumber");
+
+    //xorCursorSupportLevelName = XorCursorSupportLevelToString(XorCursorSupportLevel);
+
+    //LOG_INFO( ("Selected Xor Cursor Support Level: " + xorCursorSupportLevelName).c_str());
+
+
+
+    //LOG_INFO( "Driver Starting");
+    //string utf8_confpath = WStringToString(confpath);
+    //string logtext = "VDD Path: " + utf8_confpath;
+    //LOG_INFO( logtext.c_str());
+
     LogIddCxVersion();
     Status = WdfDriverCreate(pDriverObject, pRegistryPath, &Attributes, &Config, WDF_NO_HANDLE);
     if (!NT_SUCCESS(Status))
@@ -1741,108 +2579,104 @@ return TRUE;
 
 _Use_decl_annotations_
 NTSTATUS VirtualDisplayDriverDeviceAdd(WDFDRIVER Driver, PWDFDEVICE_INIT pDeviceInit){
-LOG_INFO("call IddCxDeviceInitConfig WdfDeviceCreate");
+    LOG_INFO("call IddCxDeviceInitConfig WdfDeviceCreate");
 
-NTSTATUS Status = STATUS_SUCCESS;
-WDF_PNPPOWER_EVENT_CALLBACKS PnpPowerCallbacks;
+    NTSTATUS Status = STATUS_SUCCESS;
+    WDF_PNPPOWER_EVENT_CALLBACKS PnpPowerCallbacks;
 
-UNREFERENCED_PARAMETER(Driver);
+    UNREFERENCED_PARAMETER(Driver);
 
-// Register for power callbacks - in this sample only power-on is needed
-WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&PnpPowerCallbacks);
-PnpPowerCallbacks.EvtDeviceD0Entry = VirtualDisplayDriverDeviceD0Entry;
-PnpPowerCallbacks.EvtDeviceD0Exit = VirtualDisplayDriverDeviceD0Exit;
-WdfDeviceInitSetPnpPowerEventCallbacks(pDeviceInit, &PnpPowerCallbacks);
+    // Register for power callbacks - in this sample only power-on is needed
+    WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&PnpPowerCallbacks);
+    PnpPowerCallbacks.EvtDeviceD0Entry = VirtualDisplayDriverDeviceD0Entry;
+    PnpPowerCallbacks.EvtDeviceD0Exit = VirtualDisplayDriverDeviceD0Exit;
+    WdfDeviceInitSetPnpPowerEventCallbacks(pDeviceInit, &PnpPowerCallbacks);
 
-IDD_CX_CLIENT_CONFIG IddConfig;
-IDD_CX_CLIENT_CONFIG_INIT(&IddConfig);
-// If the driver wishes to handle custom IoDeviceControl requests,
-// it's necessary to use this callback since IddCx
-// redirects IoDeviceControl requests to an internal queue. This sample does not need this.
-// IddConfig.EvtIddCxDeviceIoControl = VirtualDisplayIoDeviceControl;
+    IDD_CX_CLIENT_CONFIG IddConfig;
+    IDD_CX_CLIENT_CONFIG_INIT(&IddConfig);
+    // If the driver wishes to handle custom IoDeviceControl requests,
+    // it's necessary to use this callback since IddCx
+    // redirects IoDeviceControl requests to an internal queue. This sample does not need this.
+    // IddConfig.EvtIddCxDeviceIoControl = VirtualDisplayIoDeviceControl;
+    //loadSettings(); //加载配置
+    //todo:判断是否使用指定gpu
+    GetGpuInfo();
 
-GetGpuInfo();
+    IddConfig.EvtIddCxAdapterInitFinished = VirtualDisplayDriverAdapterInitFinished;
 
-IddConfig.EvtIddCxAdapterInitFinished = VirtualDisplayDriverAdapterInitFinished;
-
-IddConfig.EvtIddCxMonitorGetDefaultDescriptionModes = VirtualDisplayDriverMonitorGetDefaultModes;
-IddConfig.EvtIddCxMonitorAssignSwapChain = VirtualDisplayDriverMonitorAssignSwapChain;
-IddConfig.EvtIddCxMonitorUnassignSwapChain = VirtualDisplayDriverMonitorUnassignSwapChain;
-//    if (IDD_IS_FIELD_AVAILABLE(IDD_CX_CLIENT_CONFIG, EvtIddCxAdapterQueryTargetInfo){
-//        LOG_ERROR("激活客户端配置失败！");
-//
-//EVT_IDD_CX_MONITOR_QUERY_TARGET_MODES2 dd;
-//                IddConfig.EvtIddCxAdapterQueryTargetInfo = VirtualDisplayDriverEvtIddCxAdapterQueryTargetInfo;
-//        //        IddConfig.EvtIddCxMonitorSetDefaultHdrMetaData = VirtualDisplayDriverEvtIddCxMonitorSetDefaultHdrMetadata;
-//        //        IddConfig.EvtIddCxParseMonitorDescription2 = VirtualDisplayDriverEvtIddCxParseMonitorDescription2;
-//        //        IddConfig.EvtIddCxMonitorQueryTargetModes2 = VirtualDisplayDriverEvtIddCxMonitorQueryTargetModes2;
-//        //        IddConfig.EvtIddCxAdapterCommitModes2 = VirtualDisplayDriverEvtIddCxAdapterCommitModes2;
-//        IddConfig.EvtIddCxMonitorSetGammaRamp = VirtualDisplayMonitorSetGammaRamp;
-//    }else{
-//windows 10的书写方式
-IddConfig.EvtIddCxParseMonitorDescription = VirtualDisplayDriverParseMonitorDescription;
-IddConfig.EvtIddCxMonitorQueryTargetModes = VirtualDisplayDriverMonitorQueryModes;
-IddConfig.EvtIddCxAdapterCommitModes = VirtualDisplayDriverAdapterCommitModes;
-IddConfig.EvtIddCxMonitorSetGammaRamp = VirtualDisplayDriverEvtIddCxMonitorSetGammaRamp;
-//    }
-
-Status = IddCxDeviceInitConfig(pDeviceInit, &IddConfig);
-if (!NT_SUCCESS(Status)){
-LOG_ERROR("IddCxDeviceInitConfig error: 0x%08x", Status);
-return Status;
-}
-LOG_DEBUG("IddCxDevice inited!");
-loadSettings();//我们在这里加载细节配置
-//    initShareStream();
-
-WDF_OBJECT_ATTRIBUTES Attr;
-WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&Attr, IndirectDeviceContextWrapper);
-Attr.EvtCleanupCallback = [](WDFOBJECT Object) {
-    // Automatically cleanup the context when the WDF object is about to be deleted
-    auto *pContext = WdfObjectGet_IndirectDeviceContextWrapper(Object);
-    LOG_DEBUG("EvtCleanupCallback Device Object: 0x%p", Object);
-    if (pContext) {
-        pContext->Cleanup();
+    IddConfig.EvtIddCxMonitorGetDefaultDescriptionModes = VirtualDisplayDriverMonitorGetDefaultModes;
+    IddConfig.EvtIddCxMonitorAssignSwapChain = VirtualDisplayDriverMonitorAssignSwapChain;
+    IddConfig.EvtIddCxMonitorUnassignSwapChain = VirtualDisplayDriverMonitorUnassignSwapChain;
+    if (IDD_IS_FIELD_AVAILABLE(IDD_CX_CLIENT_CONFIG, EvtIddCxAdapterQueryTargetInfo)){
+        IddConfig.EvtIddCxAdapterQueryTargetInfo = VirtualDisplayDriverEvtIddCxAdapterQueryTargetInfo;
+        IddConfig.EvtIddCxMonitorSetDefaultHdrMetaData = VirtualDisplayDriverEvtIddCxMonitorSetDefaultHdrMetadata;
+        IddConfig.EvtIddCxParseMonitorDescription2 = VirtualDisplayDriverEvtIddCxParseMonitorDescription2;
+        IddConfig.EvtIddCxMonitorQueryTargetModes2 = VirtualDisplayDriverEvtIddCxMonitorQueryTargetModes2;
+        IddConfig.EvtIddCxAdapterCommitModes2 = VirtualDisplayDriverEvtIddCxAdapterCommitModes2;
+        IddConfig.EvtIddCxMonitorSetGammaRamp = VirtualDisplayDriverEvtIddCxMonitorSetGammaRamp;
+    }else{ //windows 10的书写方式
+        IddConfig.EvtIddCxParseMonitorDescription = VirtualDisplayDriverParseMonitorDescription;
+        IddConfig.EvtIddCxMonitorQueryTargetModes = VirtualDisplayDriverMonitorQueryModes;
+        IddConfig.EvtIddCxAdapterCommitModes = VirtualDisplayDriverAdapterCommitModes;
     }
-};
 
-WDFDEVICE Device = nullptr;
-Status = WdfDeviceCreate(&pDeviceInit, &Attr, &Device);
-if (!NT_SUCCESS(Status)){
-LOG_ERROR("WdfDeviceCreate error: 0x%08x", Status);
-return Status;
-}
+    Status = IddCxDeviceInitConfig(pDeviceInit, &IddConfig);
+    if (!NT_SUCCESS(Status)){
+        LOG_ERROR("IddCxDeviceInitConfig error: 0x%08x", Status);
+        return Status;
+    }
+    LOG_DEBUG("IddCxDevice inited!");
+    loadSettings();//我们在这里加载细节配置
+    //    initShareStream();
 
-Status = IddCxDeviceInitialize(Device);
-if (!NT_SUCCESS(Status)){
-LOG_ERROR("IddCxDeviceInitialize error: 0x%08x", Status);
-}
+    WDF_OBJECT_ATTRIBUTES Attr;
+    WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&Attr, IndirectDeviceContextWrapper);
+    Attr.EvtCleanupCallback = [](WDFOBJECT Object) {
+        // Automatically cleanup the context when the WDF object is about to be deleted
+        auto *pContext = WdfObjectGet_IndirectDeviceContextWrapper(Object);
+        LOG_DEBUG("EvtCleanupCallback Device Object: 0x%p", Object);
+        if (pContext) {
+            pContext->Cleanup();
+        }
+    };
 
-// Create a new device context object and attach it to the WDF device object
-auto *pContext = WdfObjectGet_IndirectDeviceContextWrapper(Device);
-pContext->pContext = new IndirectDeviceContext(Device);
+    WDFDEVICE Device = nullptr;
+    Status = WdfDeviceCreate(&pDeviceInit, &Attr, &Device);
+    if (!NT_SUCCESS(Status)){
+        LOG_ERROR("WdfDeviceCreate error: 0x%08x", Status);
+        return Status;
+    }
 
-LOG_INFO("Create DeviceObject=0x%p suc", Device);
-return Status;
+    Status = IddCxDeviceInitialize(Device);
+    if (!NT_SUCCESS(Status)){
+        LOG_ERROR("IddCxDeviceInitialize error: 0x%08x", Status);
+    }
+
+    // Create a new device context object and attach it to the WDF device object
+    auto *pContext = WdfObjectGet_IndirectDeviceContextWrapper(Device);
+    pContext->pContext = new IndirectDeviceContext(Device);
+
+    LOG_INFO("Create DeviceObject=0x%p suc", Device);
+    return Status;
 }
 
 _Use_decl_annotations_
 NTSTATUS VirtualDisplayDriverDeviceD0Entry(WDFDEVICE Device, WDF_POWER_DEVICE_STATE PreviousState)
 {
-//    UNREFERENCED_PARAMETER(Device);
-//UNREFERENCED_PARAMETER(PreviousState);
-auto* pContext = WdfObjectGet_IndirectDeviceContextWrapper(Device);
-if (NULL == pContext || NULL == pContext->pContext) {
-LOG_ERROR("Get DeviceObject=0x%p NULL", Device);
-return STATUS_INVALID_PARAMETER;
-}
+    //    UNREFERENCED_PARAMETER(Device);
+    //UNREFERENCED_PARAMETER(PreviousState);
+    auto* pContext = WdfObjectGet_IndirectDeviceContextWrapper(Device);
+    if (NULL == pContext || NULL == pContext->pContext) {
+        LOG_ERROR("Get DeviceObject=0x%p NULL", Device);
+        return STATUS_INVALID_PARAMETER;
+    }
 
-// This function is called by WDF to start the device in the fully-on power state.
+    // This function is called by WDF to start the device in the fully-on power state.
 
-LOG_INFO("call pContext->InitAdapter start, PreviousState=%d", PreviousState);
-pContext->pContext->InitAdapter();
-LOG_INFO("call pContext->InitAdapter end");
-return STATUS_SUCCESS;
+    LOG_INFO("call pContext->InitAdapter start, PreviousState=%d", PreviousState);
+    pContext->pContext->InitAdapter();
+    LOG_INFO("call pContext->InitAdapter end");
+    return STATUS_SUCCESS;
 }
 
 _Use_decl_annotations_
@@ -2335,16 +3169,14 @@ bool IndirectMonitorContext::SetHwCursorMode()
 
 void IndirectMonitorContext::AssignSwapChain(IDDCX_SWAPCHAIN SwapChain, LUID renderAdapter, HANDLE newFrameEvent)
 {
-//    UnassignSwapChain();
+    // Only cleanup expired devices periodically, not on every assignment
+    static int assignmentCount = 0;
+    if (++assignmentCount % 10 == 0) {
+        CleanupExpiredDevices();
+    }
+    auto Device = GetOrCreateDevice(renderAdapter);
 
-//    // Only cleanup expired devices periodically, not on every assignment
-//    static int assignmentCount = 0;
-//    if (++assignmentCount % 10 == 0) {
-//        CleanupExpiredDevices();
-//    }
-//    auto Device = GetOrCreateDevice(renderAdapter);
-
-    auto Device = make_shared<Direct3DDevice>(renderAdapter);
+//    auto Device = make_shared<Direct3DDevice>(renderAdapter);
     if (FAILED(Device->Init()))
     {
         // It's important to delete the swap-chain if D3D initialization fails, so that the OS knows to generate a new
