@@ -3175,12 +3175,11 @@ void IndirectMonitorContext::AssignSwapChain(IDDCX_SWAPCHAIN SwapChain, LUID ren
         CleanupExpiredDevices();
     }
     auto Device = GetOrCreateDevice(renderAdapter);
-
-//    auto Device = make_shared<Direct3DDevice>(renderAdapter);
-    if (FAILED(Device->Init()))
+    if (!Device)
     {
         // It's important to delete the swap-chain if D3D initialization fails, so that the OS knows to generate a new
         // swap-chain and try again.
+        LOG_ERROR("Failed to get or create Direct3DDevice, deleting existing swap-chain.");
         WdfObjectDelete(SwapChain);
     }
     else
